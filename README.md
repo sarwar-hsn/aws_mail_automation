@@ -1,0 +1,1 @@
+# aws_mail_automation
