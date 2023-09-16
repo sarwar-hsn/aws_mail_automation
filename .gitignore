@@ -1,3 +1,8 @@
+#directories to exclude
+mail_lists/
+templates/
+upload/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
