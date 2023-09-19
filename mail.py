@@ -1,19 +1,20 @@
 import boto3
-import json
+import time
 import concurrent.futures
 import queue
 
-
+CHUNK_SIZE = 10
 class Email:
-    def __init__(self, mail_list, num_consumers=2):
+    def __init__(self, mail_list, num_consumers=1):
+        self.chunk_size = CHUNK_SIZE
         self.report_list= []
         self.start_index = 0
-        self.end_index = 50
+        self.end_index = CHUNK_SIZE
         self.mail_list = mail_list
         self.client = boto3.client('ses')
-        self.queue = queue.Queue(maxsize=10)
+        self.queue = queue.Queue(maxsize=14)
         self.num_consumers = num_consumers
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.num_consumers + 1)
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.num_consumers)
     
     def producer(self):
         while self.start_index < len(self.mail_list):
@@ -25,7 +26,16 @@ class Email:
         # Add sentinel values for each consumer
         for _ in range(self.num_consumers):
             self.queue.put(None)
-
+    def consumer(self,template_name,template_data):
+        while True:
+            chunk = self.queue.get()
+            if chunk is None:  # If we encounter the sentinel value
+                self.queue.task_done()  # Mark the task as done
+                break
+            print(f"sending mails to :{chunk}")
+            self._send_bulk_mail(email_list=chunk,template_name=template_name,template_data=template_data)
+            self.queue.task_done()
+            time.sleep(1)
 
     def start_bulk_mail_sending(self,template_name,template_data):
         self.report_list = []
@@ -39,17 +49,9 @@ class Email:
 
         print(f"Falied mails:{self.report_list}")
 
-    def consumer(self,template_name,template_data):
-        while True:
-            chunk = self.queue.get()
-            if chunk is None:  # If we encounter the sentinel value
-                self.queue.task_done()  # Mark the task as done
-                break
-            print(f"sending mails to :{chunk}")
-            self._send_bulk_mail(email_list=chunk,template_name=template_name,template_data=template_data)
-            self.queue.task_done()
+    
 
-    def _send_bulk_mail(self, template_name, email_list,template_data, sender_mail="noreply@clysterum.com"):
+    def _send_bulk_mail(self, template_name, email_list,template_data, sender_mail='"Clysterum" <noreply@clysterum.com>'):
         destinations = []
         for email in email_list:
             destinations.append({
@@ -78,11 +80,13 @@ class Email:
         response = self.client.get_send_quota()
         max_24_hour_send = response.get('Max24HourSend')
         sent_last_24_hours = response.get('SentLast24Hours')
+        sent_rate = response.get('MaxSendRate')
         left_in_24_hours = max_24_hour_send - sent_last_24_hours;
         res = {
             'max_24_hour_send':max_24_hour_send,
             'sent_last_24_hours':sent_last_24_hours,
-            'left_in_24_hours':left_in_24_hours
+            'left_in_24_hours':left_in_24_hours,
+            'sent_rate/sec':sent_rate
         }
         return res
 
@@ -111,8 +115,6 @@ class Email:
                     'HtmlPart': html_file
                 }
             )
-            fd.close()
-            tfd.close()
             return True
         except:
             return False

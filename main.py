@@ -58,8 +58,8 @@ def send_function(args, send_parser, file_processor, mail_processor):
                         print("Error: Invalid value")
                         exit(1)
             template_data = json.dumps(template_data)
-            if args.worker:
-                mail_processor.num_consumers = args.worker
+            # if args.worker:
+            #     mail_processor.num_consumers = args.worker
             mail_processor.start_bulk_mail_sending(template_name=args.template,template_data=template_data)
 
 def template_function(args,template_parser,file_processor, mail_processor):
@@ -124,7 +124,7 @@ def main():
     send_parser.add_argument('-s', '--start', help='Start row num. Specifiy the start row num from specified file', type=int)
     send_parser.add_argument('-e', '--end', help='End row num. Specifiy the end row num from specified file', type=int)
     send_parser.add_argument('-n', '--name', action='store_true', help='If -n flag is used, the program will look for name column in specified file')
-    send_parser.add_argument('-w', '--worker',choices=range(1, 11), help='Number of worker threads.Max is 10 as of now. Default is 2.', type=int)
+    # send_parser.add_argument('-w', '--worker',choices=range(1, 11), help='Number of worker threads.Max is 10 as of now. Default is 2.', type=int)
     
 
     args = parser.parse_args()
@@ -151,6 +151,7 @@ if __name__ == '__main__':
     ##comment out main and uncomment this section to use bucket functionalities
     # try:
     #     bucket = Bucket()
+    #     # bucket.upload_image(local_file_name='app_overview_1.png',uploaded_file_name='app_overview_1.png')
     #     print(bucket.get_image_urls())
     # except Exception as e:
     #     print(f"Failed to initialize bucket:{e}")
