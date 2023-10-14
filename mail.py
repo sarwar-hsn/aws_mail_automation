@@ -3,51 +3,35 @@ import time
 import concurrent.futures
 import queue
 
-CHUNK_SIZE = 10
+CHUNK_SIZE = 20
+
 class Email:
     def __init__(self, mail_list, num_consumers=1):
-        self.chunk_size = CHUNK_SIZE
-        self.report_list= []
+        self.report_list = []
         self.start_index = 0
         self.end_index = CHUNK_SIZE
         self.mail_list = mail_list
         self.client = boto3.client('ses')
-        self.queue = queue.Queue(maxsize=14)
+        self.queue = queue.Queue(maxsize=20)  # Adjusted queue size
         self.num_consumers = num_consumers
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.num_consumers)
-    
-    def producer(self):
-        while self.start_index < len(self.mail_list):
-            chunk = self.mail_list[self.start_index:self.end_index]
-            self.queue.put(chunk)
-            self.start_index += len(chunk)
-            self.end_index = min(self.end_index + 50, len(self.mail_list))
-        
-        # Add sentinel values for each consumer
-        for _ in range(self.num_consumers):
-            self.queue.put(None)
-    def consumer(self,template_name,template_data):
-        while True:
-            chunk = self.queue.get()
-            if chunk is None:  # If we encounter the sentinel value
-                self.queue.task_done()  # Mark the task as done
-                break
-            print(f"sending mails to :{chunk}")
-            self._send_bulk_mail(email_list=chunk,template_name=template_name,template_data=template_data)
-            self.queue.task_done()
-            time.sleep(1)
 
-    def start_bulk_mail_sending(self,template_name,template_data):
-        self.report_list = []
-        self.executor.submit(self.producer)
-        # Start the consumers in the specified number of threads
-        for _ in range(self.num_consumers):
-            self.executor.submit(self.consumer,template_name,template_data)
-        
-        self.executor.shutdown()  # Wait for all threads to finish
-        #all email has been seent, now let's print report
+    def start_bulk_mail_sending(self, template_name, template_data):
+        total_emails = len(self.mail_list)
+        start_index = 0
+        end_index = CHUNK_SIZE
 
-        print(f"Falied mails:{self.report_list}")
+        while start_index < total_emails:
+            chunk = self.mail_list[start_index:end_index]
+            print(f"sending mails to: {chunk}")
+            self._send_bulk_mail(email_list=chunk, template_name=template_name, template_data=template_data)
+
+            start_index = end_index
+            end_index = min(end_index + CHUNK_SIZE, total_emails)
+            time.sleep(3)  # Wait for 2 seconds before proceeding to the next chunk
+
+        # After all emails have been sent
+        print(f"Failed mails: {self.report_list}")
 
     
 
